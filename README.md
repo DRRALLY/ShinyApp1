@@ -55,3 +55,73 @@ ui <- dashboardPage(
     )
   )
 )
+
+#Defining the Server 
+server <- function(input, output) {
+  
+  #Reactive expression for filtered data
+  filtered_data <- reactive({
+    airports_data %>%
+      filter(Airport %in% input$airport)
+  })
+  
+  #Generate the passenger plot output
+  output$passengerPlot <- renderPlot({
+    ggplot(filtered_data(), aes(x = factor(Month, levels = substr(month.name, 1, 3)), y = Passengers, group = Airport, color = Airport)) +
+      geom_line(size = 1.5, alpha = 0.8) +
+      #the black line is an average created to display the mean between the selected airports
+      geom_smooth(aes(group = 1), method = "loess", color = "black", se = FALSE, linetype = "dashed") +
+      #creating the individual colouring for the displayed graphs 
+      scale_color_manual(values = c("#1f78b4", "#33a02c", "#e31a1c", "#ff7f00", "#6a3d9a", "#a6cee3")) +
+      theme_minimal() +
+      labs(title = paste("Number of People Traveling from", paste(input$airport, collapse = ", "), "Over a Year"),
+           x = "Month", y = "Passenger Count")
+  })
+  
+  #Leaflet map, is proving difficult to manipulate the data so that the corresponding airport is selcted matches its name
+  output$airportMap <- renderLeaflet({
+    selected_airports <- airports_data %>% filter(Airport %in% input$airport)
+    
+    leaflet(data = selected_airports) %>%
+      addTiles() %>%
+      addMarkers(
+        lng = ~Longitude,
+        lat = ~Latitude,
+        popup = ~Airport,
+        label = ~Airport,
+        #Group markers by airport
+        group = "selectedAirports",
+        labelOptions = labelOptions(direction = "auto")
+      ) %>%
+      setView(mean(selected_airports$Longitude), mean(selected_airports$Latitude), zoom = 6)
+  })
+  
+  #Observe input$compareAll and this should update the map accordingly
+  observe({
+    if (input$compareAll) {
+      selected_airports <- airports_data %>% filter(Airport %in% input$airport)
+      updateMap(selected_airports)
+    } else {
+      selected_airport_data <- airports_data %>% filter(Airport == input$selectedAirport)
+      updateMap(selected_airport_data)
+    }
+  })
+  
+  #Helper function to update map
+  updateMap <- function(data) {
+    leaflet(data = data) %>%
+      addTiles() %>%
+      addMarkers(
+        lng = ~Longitude,
+        lat = ~Latitude,
+        popup = ~Airport,
+        label = ~Airport,
+        group = "selectedAirports",
+        labelOptions = labelOptions(direction = "auto")
+      ) %>%
+      setView(mean(data$Longitude), mean(data$Latitude), zoom = 6)
+  }
+}
+
+#Run the Shiny app (this was based for my Macbook M2, I have tested the app on a windows machine)
+shinyApp(ui = ui, server = server)
