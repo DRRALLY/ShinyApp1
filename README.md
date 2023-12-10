@@ -55,3 +55,25 @@ ui <- dashboardPage(
     )
   )
 )
+
+#Defining the Server 
+server <- function(input, output) {
+  
+  #Reactive expression for filtered data
+  filtered_data <- reactive({
+    airports_data %>%
+      filter(Airport %in% input$airport)
+  })
+  
+  #Generate the passenger plot output
+  output$passengerPlot <- renderPlot({
+    ggplot(filtered_data(), aes(x = factor(Month, levels = substr(month.name, 1, 3)), y = Passengers, group = Airport, color = Airport)) +
+      geom_line(size = 1.5, alpha = 0.8) +
+      #the black line is an average created to display the mean between the selected airports
+      geom_smooth(aes(group = 1), method = "loess", color = "black", se = FALSE, linetype = "dashed") +
+      #creating the individual colouring for the displayed graphs 
+      scale_color_manual(values = c("#1f78b4", "#33a02c", "#e31a1c", "#ff7f00", "#6a3d9a", "#a6cee3")) +
+      theme_minimal() +
+      labs(title = paste("Number of People Traveling from", paste(input$airport, collapse = ", "), "Over a Year"),
+           x = "Month", y = "Passenger Count")
+  })
