@@ -3,7 +3,7 @@ UHI Shiny App assignment 11/12/23
 
 
 
-#load folloing packages
+# Load following packages
 library(shiny)
 library(shinydashboard)
 library(ggplot2)
@@ -13,8 +13,7 @@ library(leaflet)
 # Sample data not based on real data
 airports_data <- data.frame(
   Airport = rep(c("Edinburgh", "Glasgow", "Aberdeen", "Inverness", "Dundee", "Lerwick"), each = 12),
-  # Use first 3 letters of each month
-  Month = rep(substr(month.name, 1, 3), times = 6),  
+  Month = rep(substr(month.name, 1, 3), times = 6),
   Year = rep(2022, each = 72),
   Passengers = sample(100:500, size = 72),
   Latitude = c(55.9500, 55.8652, 57.2000, 57.4778, 56.4637, 60.1545),
@@ -34,7 +33,7 @@ ui <- dashboardPage(
         title = "Airport Selection",
         status = "primary",
         solidHeader = TRUE,
-        selectInput("airport" , "Select Airport", choices = unique(airports_data$Airport) , multiple = TRUE)
+        selectInput("airport" , "Select Airport", choices = unique(airports_data$Airport), multiple = TRUE)
       )
     ),
     fluidRow(
@@ -52,33 +51,44 @@ ui <- dashboardPage(
         solidHeader = TRUE,
         leafletOutput("airportMap")
       )
+    ),
+    
+    # New tab for the report
+    tabItem(
+      tabName = "report",
+      fluidRow(
+        box(
+          title = "Report",
+          status = "warning",
+          solidHeader = TRUE,
+          width = 12,
+          verbatimTextOutput("reportText")
+        )
+      )
     )
   )
 )
 
-#Defining the Server 
+# Defining the Server 
 server <- function(input, output) {
-  
-  #Reactive expression for filtered data
+  # Reactive expression for filtered data
   filtered_data <- reactive({
     airports_data %>%
       filter(Airport %in% input$airport)
   })
   
-  #Generate the passenger plot output
+  # Generate the passenger plot output
   output$passengerPlot <- renderPlot({
     ggplot(filtered_data(), aes(x = factor(Month, levels = substr(month.name, 1, 3)), y = Passengers, group = Airport, color = Airport)) +
       geom_line(size = 1.5, alpha = 0.8) +
-      #the black line is an average created to display the mean between the selected airports
       geom_smooth(aes(group = 1), method = "loess", color = "black", se = FALSE, linetype = "dashed") +
-      #creating the individual colouring for the displayed graphs 
       scale_color_manual(values = c("#1f78b4", "#33a02c", "#e31a1c", "#ff7f00", "#6a3d9a", "#a6cee3")) +
       theme_minimal() +
       labs(title = paste("Number of People Traveling from", paste(input$airport, collapse = ", "), "Over a Year"),
            x = "Month", y = "Passenger Count")
   })
   
-  #Leaflet map, is proving difficult to manipulate the data so that the corresponding airport is selcted matches its name
+  # Leaflet map
   output$airportMap <- renderLeaflet({
     selected_airports <- airports_data %>% filter(Airport %in% input$airport)
     
@@ -89,14 +99,13 @@ server <- function(input, output) {
         lat = ~Latitude,
         popup = ~Airport,
         label = ~Airport,
-        #Group markers by airport
         group = "selectedAirports",
         labelOptions = labelOptions(direction = "auto")
       ) %>%
       setView(mean(selected_airports$Longitude), mean(selected_airports$Latitude), zoom = 6)
   })
   
-  #Observe input$compareAll and this should update the map accordingly
+  # Observe input$compareAll and update the map accordingly
   observe({
     if (input$compareAll) {
       selected_airports <- airports_data %>% filter(Airport %in% input$airport)
@@ -107,7 +116,7 @@ server <- function(input, output) {
     }
   })
   
-  #Helper function to update map
+  # Helper function to update map
   updateMap <- function(data) {
     leaflet(data = data) %>%
       addTiles() %>%
@@ -121,7 +130,18 @@ server <- function(input, output) {
       ) %>%
       setView(mean(data$Longitude), mean(data$Latitude), zoom = 6)
   }
+  
+  # Server logic for the report
+  output$reportText <- renderPrint({
+    summary_data <- filtered_data()
+    paste("Summary Report:",
+          "\nSelected Airports: ", paste(input$airport, collapse = ", "),
+          "\nTotal Passengers: ", sum(summary_data$Passengers),
+          "\nAverage Passengers per Month: ", mean(summary_data$Passengers),
+          "\nMaximum Passengers in a Month: ", max(summary_data$Passengers),
+          "\nMinimum Passengers in a Month: ", min(summary_data$Passengers))
+  })
 }
 
-#Run the Shiny app (this was based for my Macbook M2, I have tested the app on a windows machine)
+# Run the Shiny app
 shinyApp(ui = ui, server = server)
